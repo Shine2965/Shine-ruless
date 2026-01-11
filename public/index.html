@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Order Server Pterodactyl</title>
+  <style>
+    body { background:#020617;color:white;font-family:Arial }
+    .box { max-width:400px;margin:auto;padding:20px }
+    input,select,button { width:100%;padding:10px;margin-top:8px }
+    button { background:#22c55e;border:none;font-weight:bold }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h2>Order Server</h2>
+
+  <input id="username" placeholder="Username">
+  <input id="email" placeholder="Email">
+  <input id="password" placeholder="Password">
+
+  <select id="paket">
+    <option value="">Pilih Paket</option>
+    <option value="1">1 GB</option>
+    <option value="2">2 GB</option>
+    <option value="5">5 GB</option>
+    <option value="10">10 GB</option>
+    <option value="unli">Unlimited</option>
+  </select>
+
+  <button onclick="order()">Bayar & Buat Server</button>
+  <button onclick="cancel()">Batalkan</button>
+
+  <pre id="log"></pre>
+</div>
+
+<script>
+let depoId = null;
+
+async function order() {
+  const paket = document.getElementById("paket").value;
+  let harga = paket === "unli" ? 12000 : paket * 1000;
+  harga += 500;
+
+  const depo = await fetch("/api/deposit", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ amount:harga })
+  }).then(r=>r.json());
+
+  depoId = depo.data.id;
+  document.getElementById("log").innerText =
+    "Scan QRIS\nID: " + depoId;
+
+  cek();
+}
+
+async function cek() {
+  const intv = setInterval(async ()=>{
+    const res = await fetch("/api/deposit/status/"+depoId).then(r=>r.json());
+    if (res.data.status === "success") {
+      clearInterval(intv);
+      buatServer();
+    }
+  },3000);
+}
+
+async function buatServer() {
+  const data = {
+    username: username.value,
+    email: email.value,
+    password: password.value,
+    ram: paket.value
+  };
+
+  const res = await fetch("/api/create-server", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify(data)
+  }).then(r=>r.json());
+
+  alert(
+    `AKUN PANEL BERHASIL DIBUAT
+
+Email: ${res.user.email}
+Password: ${res.user.password}
+
+Server: ${res.server.name}
+
+Login:
+${res.panel_login}`
+  );
+}
+
+async function cancel() {
+  if (!depoId) return;
+  await fetch("/api/deposit/cancel/"+depoId);
+  alert("Deposit dibatalkan");
+}
+</script>
+
+</body>
+</html>
